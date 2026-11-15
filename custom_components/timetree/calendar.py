@@ -37,6 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 # be served synchronously without walking recurrence rules in the event loop.
 LOOKAHEAD_DAYS = 180
 MAX_LOOKAHEAD_OCCURRENCES = 25
+PREFERRED_EVENT_COLOR = "#00bfff"  # TimeTree's Deep Sky Blue label color.
 
 
 async def async_setup_entry(
@@ -154,6 +155,26 @@ class TimeTreeCalendarEntity(CalendarEntity, TimeTreeCalendarEntityBase):
     # ------------------------------------------------------------------
     # write support
     # ------------------------------------------------------------------
+    def _deep_sky_blue_label_id(self) -> int:
+        """Resolve this calendar's TimeTree label matching Deep Sky Blue."""
+        data = self.calendar_data
+        labels = data.calendar.labels if data is not None else {}
+        matching_ids = []
+        for label_id, label in labels.items():
+            color = (label.color or "").strip().lower()
+            if color.startswith("0x"):
+                color = color[2:]
+            if len(color) == 6:
+                color = f"#{color}"
+            if color == PREFERRED_EVENT_COLOR:
+                matching_ids.append(label_id)
+        if not matching_ids:
+            raise HomeAssistantError(
+                "This TimeTree calendar has no Deep Sky Blue (#00bfff) label. "
+                "Add that color label in TimeTree before creating events from Home Assistant."
+            )
+        return min(matching_ids)
+
     async def async_create_event(self, **kwargs: Any) -> None:
         """Create an event in TimeTree."""
         dtstart, dtend = _resolve_times(kwargs)
@@ -165,7 +186,7 @@ class TimeTreeCalendarEntity(CalendarEntity, TimeTreeCalendarEntityBase):
             start=dtstart,
             end=dtend,
             all_day=all_day,
-            label_id=None,
+            label_id=self._deep_sky_blue_label_id(),
             attendees=None,
             recurrences=_payload_recurrences(kwargs.get("rrule")),
             timezone=_timezone_name(dtstart),

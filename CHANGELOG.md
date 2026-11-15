@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.4] – 2026-11-15
+
+### Added
+
+* **Preferred TimeTree event color.** Events created from Home Assistant use the
+  selected calendar's label with Deep Sky Blue (`#00bfff`). If that label color is
+  absent, event creation fails with an actionable message rather than silently
+  assigning another color. Existing event labels are preserved on update.
+* Diagnostics include the color of each loaded calendar label so the selected
+  label can be verified without creating a test event.
+
+### Changed
+
+* Version bumped to `2.0.4` in `manifest.json` and the README badge.
+* Added regression tests for label selection, missing-label handling, and diagnostic
+  color reporting.
+
 ## [2.0.3] – 2026-10-10
 
 Maintenance release on top of `2.0.2`: the integration no longer trips Home

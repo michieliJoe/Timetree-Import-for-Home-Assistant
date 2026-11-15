@@ -17,6 +17,7 @@ import sys
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -33,6 +34,7 @@ store_mod = ha_stub.import_module("store")
 export_mod = ha_stub.import_module("export")
 options_mod = ha_stub.import_module("options")
 calendar_mod = ha_stub.import_module("calendar")
+diagnostics_mod = ha_stub.import_module("diagnostics")
 
 UTC = timezone.utc
 VIENNA = ha_stub.TEST_TZ
@@ -1384,6 +1386,45 @@ def test_export_records_source_deletion():
 # ---------------------------------------------------------------------------
 # calendar entity helpers
 # ---------------------------------------------------------------------------
+def test_diagnostics_include_calendar_label_colors():
+    """Diagnostics expose colors to verify the preferred label exists."""
+    calendar = models.TimeTreeCalendar(
+        calendar_id="42",
+        name="Family",
+        labels={7: models.TimeTreeLabel(7, "Blue", "#00bfff")},
+    )
+    calendar_data = SimpleNamespace(calendar=calendar, events={}, fetched_at=None)
+    coordinator = SimpleNamespace(
+        data=SimpleNamespace(calendars={"42": calendar_data}),
+        options=make_options(),
+        last_update_success=True,
+        last_update_success_time=None,
+    )
+
+    class Store:
+        records = {}
+        conflicts = {}
+
+        def get_meta(self, key):
+            return None
+
+    runtime = SimpleNamespace(
+        coordinator=coordinator,
+        store=Store(),
+        api=SimpleNamespace(browser_transport=True),
+        exporter=SimpleNamespace(last_error=None, last_report=None),
+    )
+    ConfigEntry = sys.modules["homeassistant.config_entries"].ConfigEntry
+    entry = ConfigEntry(data={})
+    entry.runtime_data = runtime
+    result = ha_stub.run(
+        diagnostics_mod.async_get_config_entry_diagnostics(ha_stub.HomeAssistant(), entry)
+    )
+    check(
+        result["coordinator"]["calendars"]["42"]["label_colors"] == {7: "#00bfff"}
+    )
+
+
 def test_calendar_entity_time_resolution():
     """The entity accepts both service and websocket time spellings."""
     start, end = calendar_mod._resolve_times(
@@ -1435,6 +1476,92 @@ def test_calendar_entity_builds_events():
     check(built.description.startswith("note"))
     check(built.rrule is None)
     check(built.all_day is False)
+
+
+def test_calendar_entity_create_uses_deep_sky_blue_label():
+    """New TimeTree events use the calendar label with Deep Sky Blue color."""
+    captured = {}
+
+    class Data:
+        def get(self, calendar_id):
+            return type(
+                "CalendarData",
+                (),
+                {
+                    "calendar": models.TimeTreeCalendar(
+                        calendar_id=calendar_id,
+                        name="Family",
+                        labels={
+                            1: models.TimeTreeLabel(1, "Default", "#ff0000"),
+                            7: models.TimeTreeLabel(7, "Blue", "#00BFFF"),
+                        },
+                    )
+                },
+            )()
+
+    class Coordinator:
+        data = Data()
+
+        async def async_create_event(self, calendar_id, payload):
+            captured["calendar_id"] = calendar_id
+            captured["payload"] = payload
+
+    entity = calendar_mod.TimeTreeCalendarEntity.__new__(
+        calendar_mod.TimeTreeCalendarEntity
+    )
+    entity.calendar_id = "42"
+    entity.coordinator = Coordinator()
+    ha_stub.run(
+        entity.async_create_event(
+            summary="Joe appointment",
+            dtstart=datetime(2026, 12, 8, 12, 50, tzinfo=VIENNA),
+            dtend=datetime(2026, 12, 8, 13, 0, tzinfo=VIENNA),
+        )
+    )
+    check(captured["calendar_id"] == "42")
+    check(captured["payload"]["label_id"] == 7)
+
+
+def test_calendar_entity_create_requires_deep_sky_blue_label():
+    """Creation fails instead of silently using another TimeTree label."""
+
+    class Data:
+        def get(self, calendar_id):
+            return type(
+                "CalendarData",
+                (),
+                {
+                    "calendar": models.TimeTreeCalendar(
+                        calendar_id=calendar_id,
+                        name="Family",
+                        labels={1: models.TimeTreeLabel(1, "Default", "#ff0000")},
+                    )
+                },
+            )()
+
+    class Coordinator:
+        data = Data()
+
+        async def async_create_event(self, calendar_id, payload):
+            raise AssertionError("must not create with the wrong label")
+
+    entity = calendar_mod.TimeTreeCalendarEntity.__new__(
+        calendar_mod.TimeTreeCalendarEntity
+    )
+    entity.calendar_id = "42"
+    entity.coordinator = Coordinator()
+    try:
+        ha_stub.run(
+            entity.async_create_event(
+                summary="Joe appointment",
+                dtstart=datetime(2026, 12, 8, 12, 50, tzinfo=VIENNA),
+                dtend=datetime(2026, 12, 8, 13, 0, tzinfo=VIENNA),
+            )
+        )
+    except Exception as err:  # noqa: BLE001
+        check("Deep Sky Blue" in str(err), str(err))
+    else:
+        raise AssertionError("expected an error when no matching label exists")
 
 
 def test_calendar_entity_rejects_occurrence_write():
@@ -1699,8 +1826,11 @@ TESTS = [
     test_export_import_unmanaged_two_way,
     test_export_reports_target_problems,
     test_export_records_source_deletion,
+    test_diagnostics_include_calendar_label_colors,
     test_calendar_entity_time_resolution,
     test_calendar_entity_builds_events,
+    test_calendar_entity_create_uses_deep_sky_blue_label,
+    test_calendar_entity_create_requires_deep_sky_blue_label,
     test_calendar_entity_rejects_occurrence_write,
     test_calendar_entity_rrule_validation,
     test_options_from_entry,

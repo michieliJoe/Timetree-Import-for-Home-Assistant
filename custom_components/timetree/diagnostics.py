@@ -35,6 +35,10 @@ async def async_get_config_entry_diagnostics(
                     label_id: label.name
                     for label_id, label in calendar_data.calendar.labels.items()
                 },
+                "label_colors": {
+                    label_id: label.color
+                    for label_id, label in calendar_data.calendar.labels.items()
+                },
                 "event_count": len(calendar_data.events),
                 "recurring_events": sum(1 for event in events if event.is_recurring),
                 "all_day_events": sum(1 for event in events if event.all_day),

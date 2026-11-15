@@ -1,8 +1,8 @@
 # TimeTree Calendar for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![Maintainer](https://img.shields.io/badge/maintainer-%40acdcnow-blue.svg)](https://github.com/acdcnow)
-[![Version](https://img.shields.io/badge/version-2.0.3-blue.svg)](https://github.com/acdcnow/Timetree-Import-for-Home-Assistant/releases/tag/2.0.3)
+[![Maintainer](https://img.shields.io/badge/maintainer-%40michieliJoe-blue.svg)](https://github.com/michieliJoe)
+[![Version](https://img.shields.io/badge/version-2.0.4-blue.svg)](https://github.com/michieliJoe/Timetree-Import-for-Home-Assistant/releases/tag/2.0.4)
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 <img src="ha_timetree.jpg" alt="TimeTree Calendar &amp; Scheduling — Home Assistant integration" width="900">
@@ -52,6 +52,9 @@ before something is lost.
 * `calendar.create_event`, `calendar.update_event`/`calendar/event/update` and
   `calendar.delete_event`/`calendar/event/delete` are supported for every
   TimeTree calendar entity.
+* New events created from Home Assistant use that calendar's Deep Sky Blue
+  (`#00bfff`) TimeTree label. If the label is missing, creation fails clearly
+  rather than silently using another color; updates keep the event's current label.
 * The full browser payload is sent (label, attendees, attachment, alerts,
   recurrences), the CSRF token is scraped from the event editor page and the
   requests use a browser shaped TLS fingerprint through
@@ -104,7 +107,7 @@ Conflict policies: `manual` (default, queue it), `source_wins`, `target_wins`,
 
 ### HACS (recommended)
 1. HACS → Integrations → ⋮ → *Custom repositories*.
-2. Add `https://github.com/acdcnow/Timetree-Import-for-Home-Assistant`, category *Integration*.
+2. Add `https://github.com/michieliJoe/Timetree-Import-for-Home-Assistant`, category *Integration*.
 3. Install **TimeTree Calendar**, restart Home Assistant.
 
 ### Manual
