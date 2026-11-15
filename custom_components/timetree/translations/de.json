@@ -111,6 +111,20 @@
     }
   },
   "services": {
+    "create_event": {
+      "name": "TimeTree-Termin erstellen",
+      "description": "Einen Termin erstellen und seine TimeTree-Label-Farbe wählen.",
+      "fields": {
+        "entity_id": {"name": "TimeTree-Kalender"},
+        "summary": {"name": "Zusammenfassung"},
+        "start": {"name": "Beginn", "description": "ISO-Datum oder Datum und Uhrzeit."},
+        "end": {"name": "Ende", "description": "ISO-Datum oder Datum und Uhrzeit; bei ganztägigen Terminen ist das Enddatum exklusiv."},
+        "description": {"name": "Beschreibung"},
+        "location": {"name": "Ort"},
+        "rrule": {"name": "Wiederholungsregel"},
+        "label_color": {"name": "TimeTree-Label-Farbe", "description": "Sechsstelliger Hex-Farbcode eines Labels in diesem Kalender. Standard: #47b2f7."}
+      }
+    },
     "export_now": {
       "name": "Jetzt exportieren",
       "description": "Den Kalender-Export/Synchronisation sofort ausführen.",

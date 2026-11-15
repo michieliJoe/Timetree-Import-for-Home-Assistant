@@ -48,6 +48,7 @@ CONF_EXPORT_ATTENDEES: Final = "export_attendees"
 CONF_EXPORT_INCLUDE_UNTAGGED: Final = "export_include_untagged"
 
 # --- defaults ---------------------------------------------------------------
+DEFAULT_EVENT_COLOR: Final = "#47b2f7"
 DEFAULT_SCAN_INTERVAL: Final = 60
 MIN_SCAN_INTERVAL: Final = 5
 MAX_SCAN_INTERVAL: Final = 1440
@@ -76,6 +77,7 @@ CONFLICT_POLICIES: Final = [
 ]
 
 # --- services ---------------------------------------------------------------
+SERVICE_CREATE_EVENT: Final = "create_event"
 SERVICE_EXPORT_NOW: Final = "export_now"
 SERVICE_REFRESH_NOW: Final = "refresh_now"
 SERVICE_LIST_CONFLICTS: Final = "list_conflicts"
@@ -84,6 +86,7 @@ SERVICE_RESOLVE_ALL_CONFLICTS: Final = "resolve_all_conflicts"
 SERVICE_GET_EVENT: Final = "get_event"
 
 ATTR_CALENDAR_ID: Final = "calendar_id"
+ATTR_LABEL_COLOR: Final = "label_color"
 ATTR_CONFLICT_ID: Final = "conflict_id"
 ATTR_ACTION: Final = "action"
 ATTR_DRY_RUN: Final = "dry_run"

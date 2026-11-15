@@ -2,7 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![Maintainer](https://img.shields.io/badge/maintainer-%40michieliJoe-blue.svg)](https://github.com/michieliJoe)
-[![Version](https://img.shields.io/badge/version-2.0.4-blue.svg)](https://github.com/michieliJoe/Timetree-Import-for-Home-Assistant/releases/tag/2.0.4)
+[![Version](https://img.shields.io/badge/version-2.0.5-blue.svg)](https://github.com/michieliJoe/Timetree-Import-for-Home-Assistant/releases/tag/2.0.5)
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 <img src="ha_timetree.jpg" alt="TimeTree Calendar &amp; Scheduling — Home Assistant integration" width="900">
@@ -52,9 +52,11 @@ before something is lost.
 * `calendar.create_event`, `calendar.update_event`/`calendar/event/update` and
   `calendar.delete_event`/`calendar/event/delete` are supported for every
   TimeTree calendar entity.
-* New events created from Home Assistant use that calendar's Deep Sky Blue
-  (`#00bfff`) TimeTree label. If the label is missing, creation fails clearly
-  rather than silently using another color; updates keep the event's current label.
+* New events default to the selected calendar's blue (`#47b2f7`) TimeTree label;
+  updates keep the event's current label.
+* Use `timetree.create_event` to choose a different per-event label color. It accepts
+  `label_color` as a six-digit hex value (for example `#3dc2c8`) and resolves it to
+  that calendar's label ID. Missing colors fail with the available colors listed.
 * The full browser payload is sent (label, attendees, attachment, alerts,
   recurrences), the CSRF token is scraped from the event editor page and the
   requests use a browser shaped TLS fingerprint through
@@ -160,6 +162,19 @@ data:
 
 All-day events use `start_date`/`end_date` (Home Assistant's end date is
 exclusive, TimeTree's is inclusive — the conversion happens automatically).
+
+To choose a TimeTree label color for an individual event, call the integration's
+`timetree.create_event` service:
+
+```yaml
+service: timetree.create_event
+data:
+  entity_id: calendar.family
+  summary: "Blue label test"
+  start: "2026-12-31T18:00:00-05:00"
+  end: "2026-12-31T18:05:00-05:00"
+  label_color: "#47b2f7"
+```
 
 ### Exporting to Google Calendar
 

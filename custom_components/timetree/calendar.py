@@ -26,6 +26,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .conflicts import strip_marker
+from .const import DEFAULT_EVENT_COLOR
 from .entity import TimeTreeCalendarEntityBase
 from .models import TimeTreeEvent, build_event_payload, describe_event
 from .options import CalendarOption
@@ -37,9 +38,6 @@ _LOGGER = logging.getLogger(__name__)
 # be served synchronously without walking recurrence rules in the event loop.
 LOOKAHEAD_DAYS = 180
 MAX_LOOKAHEAD_OCCURRENCES = 25
-PREFERRED_EVENT_COLOR = "#00bfff"  # TimeTree's Deep Sky Blue label color.
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -155,23 +153,44 @@ class TimeTreeCalendarEntity(CalendarEntity, TimeTreeCalendarEntityBase):
     # ------------------------------------------------------------------
     # write support
     # ------------------------------------------------------------------
-    def _deep_sky_blue_label_id(self) -> int:
-        """Resolve this calendar's TimeTree label matching Deep Sky Blue."""
+    def _label_id_for_color(self, requested_color: str) -> int:
+        """Resolve this calendar's label id for a requested hex color."""
+        color = requested_color.strip().lower()
+        if color.startswith("0x"):
+            color = color[2:]
+        if len(color) == 6:
+            color = f"#{color}"
+        if (
+            len(color) != 7
+            or color[0] != "#"
+            or any(character not in "0123456789abcdef" for character in color[1:])
+        ):
+            raise HomeAssistantError(
+                "label_color must be a six-digit hex color such as #47b2f7"
+            )
         data = self.calendar_data
         labels = data.calendar.labels if data is not None else {}
         matching_ids = []
         for label_id, label in labels.items():
-            color = (label.color or "").strip().lower()
-            if color.startswith("0x"):
-                color = color[2:]
-            if len(color) == 6:
-                color = f"#{color}"
-            if color == PREFERRED_EVENT_COLOR:
+            label_color = (label.color or "").strip().lower()
+            if label_color.startswith("0x"):
+                label_color = label_color[2:]
+            if len(label_color) == 6:
+                label_color = f"#{label_color}"
+            if label_color == color:
                 matching_ids.append(label_id)
         if not matching_ids:
+            available_colors = sorted(
+                {
+                    f"#{label.color.strip().lower().removeprefix('#').removeprefix('0x')}"
+                    for label in labels.values()
+                    if label.color
+                }
+            )
+            available = ", ".join(available_colors) or "none"
             raise HomeAssistantError(
-                "This TimeTree calendar has no Deep Sky Blue (#00bfff) label. "
-                "Add that color label in TimeTree before creating events from Home Assistant."
+                f"This TimeTree calendar has no label with color {color}. "
+                f"Available label colors: {available}."
             )
         return min(matching_ids)
 
@@ -186,7 +205,9 @@ class TimeTreeCalendarEntity(CalendarEntity, TimeTreeCalendarEntityBase):
             start=dtstart,
             end=dtend,
             all_day=all_day,
-            label_id=self._deep_sky_blue_label_id(),
+            label_id=self._label_id_for_color(
+                kwargs.get("label_color") or DEFAULT_EVENT_COLOR
+            ),
             attendees=None,
             recurrences=_payload_recurrences(kwargs.get("rrule")),
             timezone=_timezone_name(dtstart),

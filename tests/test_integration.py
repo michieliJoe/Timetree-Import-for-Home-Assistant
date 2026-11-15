@@ -35,6 +35,7 @@ export_mod = ha_stub.import_module("export")
 options_mod = ha_stub.import_module("options")
 calendar_mod = ha_stub.import_module("calendar")
 diagnostics_mod = ha_stub.import_module("diagnostics")
+service_mod = ha_stub.import_module("services")
 
 UTC = timezone.utc
 VIENNA = ha_stub.TEST_TZ
@@ -1478,8 +1479,8 @@ def test_calendar_entity_builds_events():
     check(built.all_day is False)
 
 
-def test_calendar_entity_create_uses_deep_sky_blue_label():
-    """New TimeTree events use the calendar label with Deep Sky Blue color."""
+def test_calendar_entity_create_uses_default_blue_label():
+    """New TimeTree events default to the calendar's blue label."""
     captured = {}
 
     class Data:
@@ -1493,7 +1494,7 @@ def test_calendar_entity_create_uses_deep_sky_blue_label():
                         name="Family",
                         labels={
                             1: models.TimeTreeLabel(1, "Default", "#ff0000"),
-                            7: models.TimeTreeLabel(7, "Blue", "#00BFFF"),
+                            3: models.TimeTreeLabel(3, "Blue", "#47b2f7"),
                         },
                     )
                 },
@@ -1519,11 +1520,122 @@ def test_calendar_entity_create_uses_deep_sky_blue_label():
         )
     )
     check(captured["calendar_id"] == "42")
-    check(captured["payload"]["label_id"] == 7)
+    check(captured["payload"]["label_id"] == 3)
 
 
-def test_calendar_entity_create_requires_deep_sky_blue_label():
-    """Creation fails instead of silently using another TimeTree label."""
+def test_calendar_entity_create_uses_requested_label_color():
+    """A caller can choose a different label color for one event."""
+    captured = {}
+
+    class Data:
+        def get(self, calendar_id):
+            return type(
+                "CalendarData",
+                (),
+                {
+                    "calendar": models.TimeTreeCalendar(
+                        calendar_id=calendar_id,
+                        name="Family",
+                        labels={
+                            2: models.TimeTreeLabel(2, "Teal", "#3dc2c8"),
+                            3: models.TimeTreeLabel(3, "Blue", "#47b2f7"),
+                        },
+                    )
+                },
+            )()
+
+    class Coordinator:
+        data = Data()
+
+        async def async_create_event(self, calendar_id, payload):
+            captured["payload"] = payload
+
+    entity = calendar_mod.TimeTreeCalendarEntity.__new__(
+        calendar_mod.TimeTreeCalendarEntity
+    )
+    entity.calendar_id = "42"
+    entity.coordinator = Coordinator()
+    ha_stub.run(
+        entity.async_create_event(
+            summary="Joe appointment",
+            dtstart=datetime(2026, 12, 8, 12, 50, tzinfo=VIENNA),
+            dtend=datetime(2026, 12, 8, 13, 0, tzinfo=VIENNA),
+            label_color="#3dc2c8",
+        )
+    )
+    check(captured["payload"]["label_id"] == 2)
+
+
+def test_timetree_create_event_service_passes_requested_label_color():
+    """The custom service exposes label_color and forwards it to the entity."""
+    captured = {}
+
+    class Data:
+        def get(self, calendar_id):
+            return type(
+                "CalendarData",
+                (),
+                {
+                    "calendar": models.TimeTreeCalendar(
+                        calendar_id=calendar_id,
+                        name="Family",
+                        labels={
+                            2: models.TimeTreeLabel(2, "Teal", "#3dc2c8"),
+                            3: models.TimeTreeLabel(3, "Blue", "#47b2f7"),
+                        },
+                    )
+                },
+            )()
+
+    class Coordinator:
+        data = Data()
+
+        async def async_create_event(self, calendar_id, payload):
+            captured["payload"] = payload
+
+    entity = calendar_mod.TimeTreeCalendarEntity.__new__(
+        calendar_mod.TimeTreeCalendarEntity
+    )
+    entity.calendar_id = "42"
+    entity.coordinator = Coordinator()
+
+    class Component:
+        def get_entity(self, entity_id):
+            check(entity_id == "calendar.family")
+            return entity
+
+    hass = ha_stub.HomeAssistant()
+    hass.data[sys.modules["homeassistant.components.calendar"].DATA_COMPONENT] = Component()
+    data = service_mod.CREATE_EVENT_SCHEMA(
+        {
+            "entity_id": "calendar.family",
+            "summary": "Temporary color test",
+            "start": "2026-11-16T09:00:00-05:00",
+            "end": "2026-11-16T09:05:00-05:00",
+            "label_color": "#3dc2c8",
+        }
+    )
+    default_data = service_mod.CREATE_EVENT_SCHEMA(
+        {
+            "entity_id": "calendar.family",
+            "summary": "Default color test",
+            "start": "2026-11-16T09:00:00-05:00",
+            "end": "2026-11-16T09:05:00-05:00",
+        }
+    )
+    check(default_data["label_color"] == "#47b2f7")
+    service_mod._REGISTERED = False
+    service_mod.async_register_services(hass)
+    check(hass.services.has_service(const.DOMAIN, "create_event"))
+    call = sys.modules["homeassistant.core"].ServiceCall(hass, data)
+    handler = hass.services.registered[(const.DOMAIN, "create_event")]
+    result = ha_stub.run(handler(call))
+    check(captured["payload"]["label_id"] == 2)
+    check(result["label_color"] == "#3dc2c8")
+
+
+def test_calendar_entity_create_requires_requested_label_color():
+    """Creation fails clearly when the selected color is unavailable."""
 
     class Data:
         def get(self, calendar_id):
@@ -1556,10 +1668,11 @@ def test_calendar_entity_create_requires_deep_sky_blue_label():
                 summary="Joe appointment",
                 dtstart=datetime(2026, 12, 8, 12, 50, tzinfo=VIENNA),
                 dtend=datetime(2026, 12, 8, 13, 0, tzinfo=VIENNA),
+                label_color="#00bfff",
             )
         )
     except Exception as err:  # noqa: BLE001
-        check("Deep Sky Blue" in str(err), str(err))
+        check("#00bfff" in str(err), str(err))
     else:
         raise AssertionError("expected an error when no matching label exists")
 
@@ -1829,8 +1942,10 @@ TESTS = [
     test_diagnostics_include_calendar_label_colors,
     test_calendar_entity_time_resolution,
     test_calendar_entity_builds_events,
-    test_calendar_entity_create_uses_deep_sky_blue_label,
-    test_calendar_entity_create_requires_deep_sky_blue_label,
+    test_calendar_entity_create_uses_default_blue_label,
+    test_calendar_entity_create_uses_requested_label_color,
+    test_timetree_create_event_service_passes_requested_label_color,
+    test_calendar_entity_create_requires_requested_label_color,
     test_calendar_entity_rejects_occurrence_write,
     test_calendar_entity_rrule_validation,
     test_options_from_entry,

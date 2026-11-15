@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.5] – 2026-11-15
+
+### Added
+
+* `timetree.create_event` accepts a per-event `label_color` hex parameter and
+  selects the matching label from the target TimeTree calendar. It defaults to
+  the existing blue label (`#47b2f7`); unavailable colors report the available
+  label colors.
+* `timetree.get_event` now returns the label ID and color for verification.
+
+### Changed
+
+* Standard Home Assistant event creation defaults to `#47b2f7` rather than a
+  hard-coded Deep Sky Blue label.
+* Added regression tests for default and caller-selected label colors and the
+  custom create-event service. Version bumped to `2.0.5`.
+
 ## [2.0.4] – 2026-11-15
 
 ### Added

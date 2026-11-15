@@ -111,6 +111,20 @@
     }
   },
   "services": {
+    "create_event": {
+      "name": "Create TimeTree event",
+      "description": "Create an event and choose its TimeTree label color.",
+      "fields": {
+        "entity_id": {"name": "TimeTree calendar"},
+        "summary": {"name": "Summary"},
+        "start": {"name": "Start", "description": "ISO date or date-time."},
+        "end": {"name": "End", "description": "ISO date or date-time; all-day end dates are exclusive."},
+        "description": {"name": "Description"},
+        "location": {"name": "Location"},
+        "rrule": {"name": "Recurrence rule"},
+        "label_color": {"name": "TimeTree label color", "description": "Six-digit hex color from a label on this calendar. Defaults to #47b2f7."}
+      }
+    },
     "export_now": {
       "name": "Export now",
       "description": "Run the calendar export/synchronisation immediately.",

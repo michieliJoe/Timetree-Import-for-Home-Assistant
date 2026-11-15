@@ -22,6 +22,56 @@ refresh_now:
       selector:
         text:
 
+create_event:
+  name: Create TimeTree event
+  description: Create an event in a TimeTree calendar and choose its label color.
+  fields:
+    entity_id:
+      name: TimeTree calendar
+      required: true
+      selector:
+        entity:
+          domain: calendar
+          integration: timetree
+    summary:
+      name: Summary
+      required: true
+      selector:
+        text:
+    start:
+      name: Start
+      description: ISO date or date-time.
+      required: true
+      selector:
+        text:
+    end:
+      name: End
+      description: ISO date or date-time; all-day end dates are exclusive.
+      required: true
+      selector:
+        text:
+    description:
+      name: Description
+      selector:
+        text:
+          multiline: true
+    location:
+      name: Location
+      selector:
+        text:
+    rrule:
+      name: Recurrence rule
+      description: Optional RFC 5545 rule without the RRULE prefix.
+      selector:
+        text:
+    label_color:
+      name: TimeTree label color
+      description: Six-digit hex color from a label on the selected calendar. Defaults to #47b2f7.
+      example: "#3dc2c8"
+      default: "#47b2f7"
+      selector:
+        text:
+
 list_conflicts:
   name: List conflicts
   description: Return every change that waits for a manual decision.

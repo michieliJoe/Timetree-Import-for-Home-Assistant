@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
 from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components.calendar import DATA_COMPONENT
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_ACTION,
@@ -18,8 +21,11 @@ from .const import (
     ATTR_CONFLICT_ID,
     ATTR_DRY_RUN,
     ATTR_ENTRY_ID,
+    ATTR_LABEL_COLOR,
+    DEFAULT_EVENT_COLOR,
     DOMAIN,
     RESOLUTIONS,
+    SERVICE_CREATE_EVENT,
     SERVICE_EXPORT_NOW,
     SERVICE_GET_EVENT,
     SERVICE_LIST_CONFLICTS,
@@ -62,6 +68,55 @@ GET_EVENT_SCHEMA = vol.Schema(
         vol.Required("uuid"): cv.string,
         vol.Optional(ATTR_ENTRY_ID): cv.string,
     }
+)
+
+
+def _event_time(value: Any) -> date | datetime:
+    """Parse an ISO date or date-time into a Home Assistant value."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return value
+    if not isinstance(value, str):
+        raise vol.Invalid("start and end must be ISO dates or date-times")
+    if len(value) == 10:
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            pass
+    parsed = dt_util.parse_datetime(value)
+    if parsed is None:
+        raise vol.Invalid(f"invalid ISO date or date-time: {value}")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+    return parsed
+
+
+def _validate_event_times(data: dict[str, Any]) -> dict[str, Any]:
+    """Require matching date/time forms and a positive event duration."""
+    start = data["start"]
+    end = data["end"]
+    if isinstance(start, datetime) != isinstance(end, datetime):
+        raise vol.Invalid("start and end must both be dates or both be date-times")
+    if end <= start:
+        raise vol.Invalid("end must be after start")
+    return data
+
+
+CREATE_EVENT_SCHEMA = vol.Schema(
+    vol.All(
+        {
+            vol.Required("entity_id"): cv.entity_id,
+            vol.Required("summary"): cv.string,
+            vol.Required("start"): _event_time,
+            vol.Required("end"): _event_time,
+            vol.Optional("description", default=""): cv.string,
+            vol.Optional("location", default=""): cv.string,
+            vol.Optional("rrule"): cv.string,
+            vol.Optional(ATTR_LABEL_COLOR, default=DEFAULT_EVENT_COLOR): cv.string,
+        },
+        _validate_event_times,
+    )
 )
 
 
@@ -159,6 +214,7 @@ async def _async_get_event(call: ServiceCall) -> ServiceResponse:
             event = calendar_data.get(uuid)
             if event is None:
                 continue
+            label = calendar_data.calendar.labels.get(event.label_id)
             return {
                 "event": {
                     "uuid": event.uuid,
@@ -172,12 +228,42 @@ async def _async_get_event(call: ServiceCall) -> ServiceResponse:
                     "rrule": event.rrule_line,
                     "recurrences": event.recurrences,
                     "label": event.label_name,
+                    "label_id": event.label_id,
+                    "label_color": label.color if label else None,
                     "attendees": event.attendee_names,
                     "updated_at": event.updated_at,
                     "fingerprint": event.fingerprint(),
                 }
             }
     raise HomeAssistantError(f"event {uuid} was not found")
+
+
+async def _async_create_event(call: ServiceCall) -> ServiceResponse:
+    """Create a TimeTree event with an optional per-event label color."""
+    from .calendar import TimeTreeCalendarEntity
+
+    entity_id = call.data["entity_id"]
+    component = call.hass.data.get(DATA_COMPONENT)
+    entity = component.get_entity(entity_id) if component is not None else None
+    if not isinstance(entity, TimeTreeCalendarEntity):
+        raise HomeAssistantError(
+            f"{entity_id} is not a loaded TimeTree calendar entity"
+        )
+
+    await entity.async_create_event(
+        summary=call.data["summary"],
+        description=call.data["description"],
+        location=call.data["location"],
+        dtstart=call.data["start"],
+        dtend=call.data["end"],
+        rrule=call.data.get("rrule"),
+        label_color=call.data[ATTR_LABEL_COLOR],
+    )
+    return {
+        "entity_id": entity_id,
+        "summary": call.data["summary"],
+        "label_color": call.data[ATTR_LABEL_COLOR],
+    }
 
 
 _REGISTERED = False
@@ -188,6 +274,13 @@ def async_register_services(hass: HomeAssistant) -> None:
     global _REGISTERED  # noqa: PLW0603 - module level flag mirrors core style
     if _REGISTERED:
         return
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_EVENT,
+        _async_create_event,
+        schema=CREATE_EVENT_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     hass.services.async_register(
         DOMAIN,
         SERVICE_EXPORT_NOW,
@@ -239,6 +332,7 @@ def async_remove_services(hass: HomeAssistant) -> None:
     if hass.config_entries.async_loaded_entries(DOMAIN):
         return
     for service in (
+        SERVICE_CREATE_EVENT,
         SERVICE_EXPORT_NOW,
         SERVICE_REFRESH_NOW,
         SERVICE_LIST_CONFLICTS,
